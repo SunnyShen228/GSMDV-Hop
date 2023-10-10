@@ -1,0 +1,1525 @@
+#生成测试项目参数序列
+import openpyxl
+import numpy as np
+import pandas as pd
+import math
+import random
+from openpyxl import load_workbook
+import xlsxwriter
+test_title = np.zeros((53,3),int)#节点数、比例、半径
+for i in range(0,9): #节点数100-500 间隔50,0.3 100
+    test_title[i][0] = 100 + i*50
+    test_title[i][1] = 30
+    test_title[i][2] = 100
+for i in range(9,18): #节点数150 比例0.1 0.2 半径100
+    test_title[i][0] = 150
+    test_title[i][1] = 10 + 10*(i-9)
+    test_title[i][2] = 100
+for i in range(18,31): #节点数150 比例0.3半径100-400间隔25
+    test_title[i][0] = 150
+    test_title[i][1] = 30
+    test_title[i][2] = 100 + 25*(i-18)
+for i in range(31,41):
+    test_title[i][0] = 50 + 50 + 50 *(i-31)
+    test_title[i][1] = 50/test_title[i][0]*100
+    test_title[i][2] = 100
+for i in range(41,53):
+    test_title[i][0] = 25 + 25*(i-41) + 100
+    test_title[i][1] = (25 + 25*(i-41))/test_title[i][0]*100
+    test_title[i][2] = 100
+# print(test_title)
+
+#生成原始数据存储文件、初步汇总存储文件
+#导入建立和写入excel文件的模块
+arrnum = 53
+mul_time = 100
+x_length = 500
+y_length = 500
+
+for ttn in range(0,arrnum):
+    total_node = test_title[ttn][0]
+    beacon_percent = round(0.01 * test_title[ttn][1], 2)
+    commu_range = test_title[ttn][2]
+    for j in range(1,5):
+        excelname1 = str(j)+'-'+str(str(ttn+1)+'节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook1 = xlsxwriter.Workbook(excelname1)     #新建excel表
+        for i in range(0,mul_time):
+            sheetname1 = str('sheet'+str(i+1))
+            worksheet1 = workbook1.add_worksheet(sheetname1)       #新建sheet（sheet的名称为"sheet1"）
+            worksheet1.write_row('A1','序')
+            worksheet1.write_row('B1','横')
+            worksheet1.write_row('C1','纵')
+            worksheet1.write_row('D1','标')
+        workbook1.close() #关闭
+        
+        excelname2 = str(j)+'-'+str(str(ttn+1)+'汇总-节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook2 = xlsxwriter.Workbook(excelname2)     #新建excel表
+        for k in range(0,2): #新建2个工作簿
+            sheetname2 = str('Sheet'+str(k+1))
+            worksheet2 = workbook2.add_worksheet(sheetname2)
+            worksheet2.write_row('A1','组序号')
+        workbook2.close() #关闭
+
+def duishu(ligi):
+    if ligi <= 1:
+        fanhui = 0.0001
+    else:
+        fanhui = np.log10(ligi)
+    if math.isnan(fanhui) == True:
+        fanhui = 0.0001
+    if math.isinf(fanhui) == True:
+        fanhui = 0.0001
+    return fanhui
+
+for ttn in range(0,arrnum):
+    total_node = test_title[ttn][0]
+    beacon_percent = round(0.01 * test_title[ttn][1], 2)
+    commu_range = test_title[ttn][2]
+    
+    for ti in range(0,mul_time):        
+        beacon_node = int(total_node * beacon_percent)
+        unknown_node = int(total_node - beacon_node)
+        node_array = np.zeros((total_node,3),dtype = int)
+        beacon_array = np.zeros((beacon_node,5),dtype = int)
+        unknown_array = np.zeros((unknown_node,4),dtype = int)
+        hops_num = np.zeros((total_node, total_node))
+        distance = np.zeros((total_node, total_node))
+        hops_before = np.zeros((total_node, total_node))
+        appr_dis = np.zeros((unknown_node,beacon_node),int)
+        distance_commu = np.zeros((total_node, total_node))
+        re_label = 1
+        re = 0
+        while re_label != 0:
+            re += 1
+            re_label = 0
+            for j in range(0,total_node):  #生成测试数组
+                x_axis = random.randrange(0,x_length)
+                y_axis = random.randrange(0,y_length)
+                node_array[j][0] = x_axis
+                node_array[j][1] = y_axis
+                if j <beacon_node:
+                    node_array[j][2] = 1
+                    beacon_array[j][0]=node_array[j][0]
+                    beacon_array[j][1]=node_array[j][1]
+                    beacon_array[j][2]=1
+                else:
+                    node_array[j][2] = 0
+                    unknown_array[j-beacon_node][0]=node_array[j][0]
+                    unknown_array[j-beacon_node][1]=node_array[j][1]
+                    unknown_array[j-beacon_node][2]=0
+
+            for i in range(0,total_node):   #测算实际距离
+                for j in range(0,total_node):
+                    if i == j:
+                        hops_num[i][j] = 0
+                        distance[i][j] = 0
+                    else:
+                        distance[i][j] = ((node_array[i][0] - node_array[j][0]) ** 2 + (node_array[i][1] - node_array[j][1]) ** 2) ** 0.5
+                        if distance[i][j] <= commu_range:
+                            hops_num[i][j] = 1
+                        else:
+                            hops_num[i][j] = float("inf")
+                    distance_commu[i][j] = distance[i][j]
+                    
+            biaoji = 1
+            while biaoji != 0:
+                biaoji = 0
+                for i in range(0,total_node):
+                    for j in range(0,total_node):
+                        for k in range(0,total_node):
+                            if (hops_num[i][k]+hops_num[k][j]) < hops_num[i][j]:
+                                hops_num[i][j] = hops_num[i][k]+hops_num[k][j]
+                                biaoji += 1
+                                distance_commu[i][j] = distance_commu[i][k] + distance_commu[k][j]
+
+            for xx in range(0,total_node):
+                for yy in range(0,total_node):
+                    if (xx != yy) & (hops_num[xx][yy] == 0):
+                        re_label += 1
+                    if math.isinf(hops_num[xx][yy]) == True:
+                        re_label += 1
+        print(re)
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组数据生成成功！')
+
+        #计算信标结点平均跳距矩阵
+        for i in range(0,beacon_node):
+            dist_sum = 0
+            hop_sum = 0
+            for j in range(0,beacon_node):
+                dist_sum += distance[i][j]
+                hop_sum += hops_num[i][j]
+            beacon_array[i][2] = dist_sum / hop_sum
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组测试准备完成！')
+        
+        
+        
+        #1测试信标节点平均跳距修正方案
+        excelname1 = '1-'+str(str(ttn+1)+'汇总-节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook1 = xlsxwriter.Workbook(excelname1)     #新建excel表
+        #汇总工作簿工作表初始化
+        wb1 = openpyxl.load_workbook(excelname1)
+        sheet1 = wb1['Sheet1']
+        sheet2 = wb1['Sheet2']
+        sheet1.cell(row=ti+2, column=1).value = ti+1
+        sheet2.cell(row=ti+2, column=1).value = ti+1
+        
+        #数据存储工作簿建立
+        excelname = '1-'+str(str(ttn+1)+'节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook = xlsxwriter.Workbook(excelname)     #新建excel表    
+        wb = openpyxl.load_workbook(excelname) # 获取workbook中所有的表格
+        sheetname = str('sheet'+str(ti+1)) 
+        sheet = wb[sheetname]
+        
+        for j in range(0,total_node):
+            sheet.cell(row=j+2, column=1).value = j+1
+            sheet.cell(row=j+2, column=2).value = node_array[j][0]
+            sheet.cell(row=j+2, column=3).value = node_array[j][1]
+            sheet.cell(row=j+2, column=4).value = node_array[j][2]
+        
+        #修正信标节点的平均跳距
+        
+        for tttt in range(0,202):
+            for i in range(0,beacon_node):
+                taosum = 0
+                hopsum = 0
+                for j in range(0,beacon_node):
+                    if i != j:
+                        taosum += abs(beacon_array[i][2] * hops_num[i][j] - distance[i][j])
+                        hopsum += hops_num[i][j]
+                if tttt == 0:
+                    beacon_array[i][3] = beacon_array[i][2]
+                else:   
+                    beacon_array[i][3] = beacon_array[i][2] + 0.01 * (tttt-101) * taosum/hopsum
+            
+            for i in range(0,unknown_node):
+                min_hop = float("inf")
+                min_hop_disdis = float("inf")
+                min_hop_dis = float("inf")
+                for j in range(0,beacon_node):
+                    if distance_commu[i+beacon_node][j] < min_hop_disdis:
+                        min_hop = hops_num[i+beacon_node][j]                  
+                        min_hop_dis = beacon_array[j][3]
+                        min_hop_disdis = distance_commu[i+beacon_node][j]
+                for j in range(0,beacon_node):
+                    appr_dis[i][j] = min_hop_dis * hops_num[i+beacon_node][j]
+        #print(hops_num)
+        #print(appr_dis)
+
+            #未知节点估计 最小二乘法
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                ATA = np.transpose(A)
+                C = np.dot(ATA,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X = np.dot(CAT,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+            #print(error_avg)
+            #print(rmse)
+
+            #向excel中写入表头
+            sheet.cell(row=1, column=6 + 3*tttt).value ='信标节点平均跳距修正-' + str(tttt)
+
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=6 + 3*tttt).value = '平均误差'
+            sheet.cell(row=3, column=6 + 3*tttt).value = error_avg
+            sheet.cell(row=2, column=7 + 3*tttt).value = "RMSE"
+            sheet.cell(row=3, column=7 + 3*tttt).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=6 + 3*tttt).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=7 + 3*tttt).value = unknown_array[ni][3]
+
+            if ti==0: #存入统计汇总表格
+                sheet1.cell(row=ti+1, column=2+tttt).value = '信标节点平均跳距修正-' + str(tttt) 
+                sheet2.cell(row=ti+1, column=2+tttt).value = '信标节点平均跳距修正-' + str(tttt)  
+
+            sheet1.cell(row=ti+2, column=2+tttt).value = error_avg
+            sheet2.cell(row=ti+2, column=2+tttt).value = rmse    
+
+        wb.save(excelname)
+        wb1.save(excelname1)
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组测试-1存储完成！')
+
+        
+        #2测试 未知节点选择的估计距离矩阵的跳距
+        excelname1 = '2-'+str(str(ttn+1)+'汇总-节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook1 = xlsxwriter.Workbook(excelname1)     #新建excel表
+        #汇总工作簿工作表初始化
+        wb1 = openpyxl.load_workbook(excelname1)
+        sheet1 = wb1['Sheet1']
+        sheet2 = wb1['Sheet2']
+        sheet1.cell(row=ti+2, column=1).value = ti+1
+        sheet2.cell(row=ti+2, column=1).value = ti+1
+        
+        #数据存储工作簿建立
+        excelname = '2-'+str(str(ttn+1)+'节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook = xlsxwriter.Workbook(excelname)     #新建excel表    
+        wb = openpyxl.load_workbook(excelname) # 获取workbook中所有的表格
+        sheetname = str('sheet'+str(ti+1)) 
+        sheet = wb[sheetname]
+        
+        for j in range(0,total_node):
+            sheet.cell(row=j+2, column=1).value = j+1
+            sheet.cell(row=j+2, column=2).value = node_array[j][0]
+            sheet.cell(row=j+2, column=3).value = node_array[j][1]
+            sheet.cell(row=j+2, column=4).value = node_array[j][2]
+        
+        appr_dis1 = np.zeros((unknown_node,beacon_node),int)
+        appr_dis2 = np.zeros((unknown_node,beacon_node),int)
+        appr_dis3 = np.zeros((unknown_node,beacon_node),int)
+        appr_dis4 = np.zeros((unknown_node,beacon_node),int)
+        appr_dis5 = np.zeros((unknown_node,beacon_node),int)
+        
+        for nuno in range(0,11):  #循环记录不同数量的信标节点列表
+            if nuno == 0:
+                number_node = 1  #最近的1个
+            else:
+                number_node = int(0.1*nuno*total_node*beacon_percent)#百分之10到百分之一百
+            #用最近信标节点的跳距，跳段数估计距离矩阵
+            for i in range(0,unknown_node):
+                save_min = np.zeros((number_node,3),dtype = float)
+                for x in range(0,number_node):
+                    save_min[x][0] = float("inf")
+                    save_min[x][1] = float("inf")
+                    save_min[x][2] = float("inf")        
+                for j in range(0,beacon_node):
+                    a = hops_num[i+beacon_node][j]   #两点间跳段数
+                    b = beacon_array[j][2]         #该点跳距
+                    ad = distance_commu[i+beacon_node][j] #两点间通讯距离
+                    if ad < save_min[number_node-1][2]:
+                        save_min[number_node-1][0] = a
+                        save_min[number_node-1][1] = b
+                        save_min[number_node-1][2] = ad
+                        if number_node > 1:
+                            for k in range(number_node-1,0,-1):
+                                if ad < save_min[k-1][2]:
+                                    save_min[k][0] = save_min[k-1][0]
+                                    save_min[k][1] = save_min[k-1][1]
+                                    save_min[k][2] = save_min[k-1][2]
+                                    save_min[k-1][0] = a
+                                    save_min[k-1][1] = b
+                                    save_min[k-1][2] = ad
+
+                #print(save_min)
+                stan_hop = save_min[number_node-1][0]
+                stan_hop_dis = save_min[number_node-1][1]
+                stan_hop_disdis= save_min[number_node-1][2]    #实际通讯距离
+
+                #1用列表中最大点跳距
+                use_hop_dis = save_min[number_node-1][1]
+                for j in range(0,beacon_node):
+                    if distance_commu[i+beacon_node][j] <= stan_hop_disdis:
+                        appr_dis1[i][j] = beacon_array[j][2] * hops_num[i+beacon_node][j]
+                    else:
+                        appr_dis1[i][j] = use_hop_dis * hops_num[i+beacon_node][j]
+
+                #2用列表中最小点跳距
+                use_hop_dis = save_min[0][1]
+                for j in range(0,beacon_node):
+                    if distance_commu[i+beacon_node][j] <= stan_hop_disdis:
+                        appr_dis2[i][j] = beacon_array[j][2] * hops_num[i+beacon_node][j]
+                    else:
+                        appr_dis2[i][j] = use_hop_dis * hops_num[i+beacon_node][j]
+
+                #3用列表平均跳距
+                use_hop_dis = 0
+                for x in range(0,number_node):
+                    use_hop_dis +=save_min[x][1]
+                use_hop_dis = use_hop_dis / number_node
+                for j in range(0,beacon_node):
+                    if distance_commu[i+beacon_node][j] <= stan_hop_disdis:
+                        appr_dis3[i][j] = beacon_array[j][2] * hops_num[i+beacon_node][j]
+                    else:
+                        appr_dis3[i][j] = use_hop_dis * hops_num[i+beacon_node][j]
+
+                #4用列表增比例累加
+                use_hop_dis = 0
+                use_hop_dis_summ = 0
+                for x in range(0,number_node):
+                    use_hop_dis += save_min[x][1] * save_min[x][0]
+                    use_hop_dis_summ += save_min[x][0]
+                use_hop_dis = use_hop_dis / use_hop_dis_summ
+                for j in range(0,beacon_node):
+                    if distance_commu[i+beacon_node][j] <= stan_hop_disdis:
+                        appr_dis4[i][j] = beacon_array[j][2] * hops_num[i+beacon_node][j]
+                    else:
+                        appr_dis4[i][j] = use_hop_dis * hops_num[i+beacon_node][j]
+
+                #5用列表减比例累加
+                use_hop_dis = 0
+                use_hop_dis_summ = 0
+                for x in range(0,number_node):
+                    use_hop_dis += save_min[x][1] / save_min[x][0]
+                    use_hop_dis_summ += 1/save_min[x][0]
+                use_hop_dis = use_hop_dis / use_hop_dis_summ
+                for j in range(0,beacon_node):
+                    if distance_commu[i+beacon_node][j] <= stan_hop_disdis:
+                        appr_dis5[i][j] = beacon_array[j][2] * hops_num[i+beacon_node][j]
+                    else:
+                        appr_dis5[i][j] = use_hop_dis * hops_num[i+beacon_node][j]
+            
+            #1情况
+            appr_dis = appr_dis1
+            #未知节点估计 最小二乘法
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                ATA = np.transpose(A)
+                C = np.dot(ATA,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X = np.dot(CAT,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+            #print(error_avg)
+            #print(rmse)
+            #向excel中写入表头
+            sheet.cell(row=1, column=6+15*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-1'
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=6+15*nuno).value = '平均误差'
+            sheet.cell(row=3, column=6+15*nuno).value = error_avg
+            sheet.cell(row=2, column=7+15*nuno).value = "RMSE"
+            sheet.cell(row=3, column=7+15*nuno).value = rmse
+
+
+            if ti==0:
+                sheet1.cell(row=ti+1, column=2+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-1'
+                sheet2.cell(row=ti+1, column=2+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-1'
+
+            sheet1.cell(row=ti+2, column=2+5*nuno).value = error_avg
+            sheet2.cell(row=ti+2, column=2+5*nuno).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=6+15*nuno).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=7+15*nuno).value = unknown_array[ni][3]
+
+            #2情况
+            appr_dis = appr_dis2
+            #未知节点估计 最小二乘法
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                ATA = np.transpose(A)
+                C = np.dot(ATA,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X = np.dot(CAT,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+            #print(error_avg)
+            #print(rmse)
+            #向excel中写入表头
+            sheet.cell(row=1, column=9+15*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-2'
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=9+15*nuno).value = '平均误差'
+            sheet.cell(row=3, column=9+15*nuno).value = error_avg
+            sheet.cell(row=2, column=10+15*nuno).value = "RMSE"
+            sheet.cell(row=3, column=10+15*nuno).value = rmse
+
+            if ti==0:
+                sheet1.cell(row=ti+1, column=3+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-2'
+                sheet2.cell(row=ti+1, column=3+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-2'       
+            sheet1.cell(row=ti+2, column=3+5*nuno).value = error_avg
+            sheet2.cell(row=ti+2, column=3+5*nuno).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=9+15*nuno).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=10+15*nuno).value = unknown_array[ni][3]
+
+            #3情况
+            appr_dis = appr_dis3
+            #未知节点估计 最小二乘法
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                ATA = np.transpose(A)
+                C = np.dot(ATA,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X = np.dot(CAT,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+            #print(error_avg)
+            #print(rmse)
+            #向excel中写入表头
+            sheet.cell(row=1, column=12+15*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-3'
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=12+15*nuno).value = '平均误差'
+            sheet.cell(row=3, column=12+15*nuno).value = error_avg
+            sheet.cell(row=2, column=13+15*nuno).value = 'RMSE'
+            sheet.cell(row=3, column=13+15*nuno).value = rmse
+
+            if ti==0:
+                sheet1.cell(row=ti+1, column=4+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-3'
+                sheet2.cell(row=ti+1, column=4+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-3'
+            sheet1.cell(row=ti+2, column=4+5*nuno).value = error_avg
+            sheet2.cell(row=ti+2, column=4+5*nuno).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=12+15*nuno).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=13+15*nuno).value = unknown_array[ni][3]
+
+            #4情况
+            appr_dis = appr_dis4
+            #未知节点估计 最小二乘法
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                ATA = np.transpose(A)
+                C = np.dot(ATA,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X = np.dot(CAT,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+            #print(error_avg)
+            #print(rmse)
+            #向excel中写入表头
+            sheet.cell(row=1, column=15+15*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-4'
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=15+15*nuno).value = '平均误差'
+            sheet.cell(row=3, column=15+15*nuno).value = error_avg
+            sheet.cell(row=2, column=16+15*nuno).value = 'RMSE'
+            sheet.cell(row=3, column=16+15*nuno).value = rmse
+
+            if ti==0:
+                sheet1.cell(row=ti+1, column=5+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-4'
+                sheet2.cell(row=ti+1, column=5+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-4'
+            sheet1.cell(row=ti+2, column=5+5*nuno).value = error_avg
+            sheet2.cell(row=ti+2, column=5+5*nuno).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=15+15*nuno).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=16+15*nuno).value = unknown_array[ni][3]    
+
+            #5情况
+            appr_dis = appr_dis5
+            #未知节点估计 最小二乘法
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                ATA = np.transpose(A)
+                C = np.dot(ATA,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X = np.dot(CAT,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+            #print(error_avg)
+            #print(rmse)
+            #向excel中写入表头
+            sheet.cell(row=1, column=18+15*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-5'
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=18+15*nuno).value = '平均误差'
+            sheet.cell(row=3, column=18+15*nuno).value = error_avg
+            sheet.cell(row=2, column=19+15*nuno).value = 'RMSE'
+            sheet.cell(row=3, column=19+15*nuno).value = rmse
+
+            if ti==0:
+                sheet1.cell(row=ti+1, column=6+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-5'
+                sheet2.cell(row=ti+1, column=6+5*nuno).value = '跳距选择估计距离' + str(nuno+1) + '-5'
+            sheet1.cell(row=ti+2, column=6+5*nuno).value = error_avg
+            sheet2.cell(row=ti+2, column=6+5*nuno).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=18+15*nuno).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=19+15*nuno).value = unknown_array[ni][3]
+        wb.save(excelname)
+        wb1.save(excelname1)
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组测试-2存储完成！')       
+        
+        #3测试 最小二乘法权重矩阵
+        excelname1 = '3-'+str(str(ttn+1)+'汇总-节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook1 = xlsxwriter.Workbook(excelname1)     #新建excel表
+        #汇总工作簿工作表初始化
+        wb1 = openpyxl.load_workbook(excelname1)
+        sheet1 = wb1['Sheet1']
+        sheet2 = wb1['Sheet2']
+        sheet1.cell(row=ti+2, column=1).value = ti+1
+        sheet2.cell(row=ti+2, column=1).value = ti+1
+        
+        #数据存储工作簿建立
+        excelname = '3-'+str(str(ttn+1)+'节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook = xlsxwriter.Workbook(excelname)     #新建excel表    
+        wb = openpyxl.load_workbook(excelname) # 获取workbook中所有的表格
+        sheetname = str('sheet'+str(ti+1)) 
+        sheet = wb[sheetname]
+        
+        for j in range(0,total_node):
+            sheet.cell(row=j+2, column=1).value = j+1
+            sheet.cell(row=j+2, column=2).value = node_array[j][0]
+            sheet.cell(row=j+2, column=3).value = node_array[j][1]
+            sheet.cell(row=j+2, column=4).value = node_array[j][2]
+        
+        #最近平均跳距估计距离
+        for i in range(0,unknown_node):
+            min_hop = float("inf")
+            min_hop_dis = float("inf")
+            min_hop_disdis = float("inf")        
+            for j in range(0,beacon_node):
+                if min_hop_disdis > distance_commu[i+beacon_node][j]:
+                    min_hop = hops_num[i+beacon_node][j]                  
+                    min_hop_dis = beacon_array[j][2]
+                    min_hop_disdis = distance_commu[i+beacon_node][j]
+            use_hop_dis = min_hop_dis
+            for j in range(0,beacon_node):
+                appr_dis[i][j] = use_hop_dis * hops_num[i+beacon_node][j]
+
+
+        for point_t in range(0,5):
+            point_hop = point_t + 1
+            #未知节点估计 最小二乘法
+            for ww in range(0,26):
+                A = np.zeros((beacon_node-1,2))
+                BB = np.zeros((beacon_node-1,1))
+                B = np.zeros((beacon_node-1,1))
+                for i in range(beacon_node, total_node):
+                    k = i - beacon_node
+                    D = np.zeros((beacon_node-1,beacon_node-1))
+                    for j in range(0,beacon_node-1):
+                        A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                        A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                        B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                    if ww==0:   #1平均
+                        for j in range(0,beacon_node-1):
+                            D[j][j] = 1
+                    elif ww==1:  #2跳段数
+                        for j in range(0,beacon_node-1):
+                            D[j][j] = hops_num[i][j]  
+                    elif ww==2:  #3小幅度增函数
+                        for j in range(0,beacon_node-1):
+                            D[j][j] = 10 ** (-1/hops_num[i][j])
+                    elif ww==3:  #4大幅度增函数
+                        for j in range(0,beacon_node-1):
+                            D[j][j] = 10 ** (hops_num[i][j])
+                    elif ww==4:   #5分层 增函数
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (hops_num[i][j])             
+                            else:
+                                D[j][j] = 10 ** (-1/hops_num[i][j])
+                    elif ww==5:   #6断层 增函数
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (-1/hops_num[i][j])             
+                            else:
+                                D[j][j] = 10 ** (hops_num[i][j])
+                    elif ww==6:  #7小幅度减函数
+                        for j in range(0,beacon_node-1):
+                            D[j][j] = 10 ** (-hops_num[i][j])
+                    elif ww==7:  #8大幅度减函数
+                        for j in range(0,beacon_node-1):
+                            D[j][j] = 10 ** (1/hops_num[i][j])
+                    elif ww==8:   #9分层 减函数
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (-hops_num[i][j])             
+                            else:
+                                D[j][j] = 10 ** (1/hops_num[i][j])
+                    elif ww==9:   #10断层 减函数
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (1/hops_num[i][j])             
+                            else:
+                                D[j][j] = 10 ** (-hops_num[i][j])                    
+                    elif ww==10:   #11大小大 减增 连续小幅度
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (-hops_num[i][j]/point_hop)
+                            else:
+                                D[j][j] = 10 ** (-point_hop/hops_num[i][j]) 
+                    elif ww==11:   #12大小大 减增 连续大幅度
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (point_hop/hops_num[i][j])
+                            else:
+                                D[j][j] = 10 ** (hops_num[i][j]/point_hop)                             
+                    elif ww==12:   #13大小大 减增 分层 小-大
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (-hops_num[i][j]/point_hop)  
+                            else:
+                                D[j][j] = 10 ** (hops_num[i][j]/point_hop)                           
+                    elif ww==13:   #14大小大 减增 断层 大-小
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (point_hop/hops_num[i][j])  
+                            else:
+                                D[j][j] = 10 ** (-point_hop/hops_num[i][j])
+                    elif ww==14:   #15小大小 增减 连续小幅度
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (-point_hop/hops_num[i][j]) 
+                            else:
+                                D[j][j] = 10 ** (-hops_num[i][j]/point_hop)                    
+                    elif ww==15:   #16小大小 增减 连续大幅度
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (hops_num[i][j]/point_hop) 
+                            else:
+                                D[j][j] = 10 ** (point_hop/hops_num[i][j])                    
+                    elif ww==16:   #17小大小 增减 分层 大-小
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (hops_num[i][j]/point_hop) 
+                            else:
+                                D[j][j] = 10 ** (-hops_num[i][j]/point_hop)
+                    elif ww==17:   #18小大小 增减 断层 小-大
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j]<= point_hop:
+                                D[j][j] = 10 ** (-point_hop/hops_num[i][j]) 
+                            else:
+                                D[j][j] = 10 ** (point_hop/hops_num[i][j])
+                    elif ww==18: #RSSI小到大、hop小到大
+                        RSSI = 0
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += duishu(appr_dis[k][j])
+                            else:
+                                dihop += hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = duishu(appr_dis[k][beacon_node-1]) / RSSI
+                        else:
+                            apupu = hops_num[i][beacon_node-1]/dihop
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = duishu(appr_dis[k][j]) / RSSI
+                            else:
+                                D[j][j] = hops_num[i][j]/dihop
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu
+                    
+                    elif ww==19: #RSSI大到小、hop小到大
+                        RSSI = 0
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += 1 / duishu(appr_dis[k][j])
+                            else:
+                                dihop += hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = (1 / duishu(appr_dis[k][beacon_node-1]))/ RSSI
+                        else:
+                            apupu = hops_num[i][beacon_node-1]/dihop
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = (1 / duishu(appr_dis[k][j])) / RSSI
+                            else:
+                                D[j][j] = hops_num[i][j]/dihop
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu
+                            
+                    elif ww==20: #RSSI小到大、hop大到小
+                        RSSI = 0
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += duishu(appr_dis[k][j])
+                            else:
+                                dihop += 1/hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = duishu(appr_dis[k][beacon_node-1]) / RSSI
+                        else:
+                            apupu = (1/hops_num[i][beacon_node-1])/dihop
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = duishu(appr_dis[k][j]) / RSSI
+                            else:
+                                D[j][j] = (1/ hops_num[i][j])/dihop
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu
+                    elif ww==21: #RSSI大到小、hop大到小
+                        RSSI = 0
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += 1/duishu(appr_dis[k][j])
+                            else:
+                                dihop += 1/hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = (1/duishu(appr_dis[k][beacon_node-1])) / RSSI
+                        else:
+                            apupu = (1/hops_num[i][beacon_node-1])/dihop
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = (1/duishu(appr_dis[k][j])) / RSSI
+                            else:
+                                D[j][j] = (1/ hops_num[i][j])/dihop
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu
+                    elif ww==22: #RSSI小到大、控制后面部分的总体权重（后面一样） hop小到大
+                        RSSIR = duishu(commu_range)
+                        RSSI = RSSIR
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += duishu(appr_dis[k][j])
+                            else:
+                                dihop += hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = duishu(appr_dis[k][beacon_node-1]) / RSSI
+                        else:
+                            apupu = (hops_num[i][beacon_node-1]/dihop) * RSSIR/ RSSI
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = duishu(appr_dis[k][j]) / RSSI
+                            else:
+                                D[j][j] = (hops_num[i][j]/dihop)* RSSIR/RSSI
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu
+                    
+                    elif ww==23: #RSSI大到小、hop小到大
+                        RSSIR = 1/duishu(commu_range) 
+                        RSSI = RSSIR
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += 1 / duishu(appr_dis[k][j])
+                            else:
+                                dihop += hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = (1 / duishu(appr_dis[k][beacon_node-1]))/ RSSI
+                        else:
+                            apupu = (hops_num[i][beacon_node-1]/dihop)* RSSIR/ RSSI
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = (1 / duishu(appr_dis[k][j])) / RSSI
+                            else:
+                                D[j][j] = (hops_num[i][j]/dihop) * RSSIR/ RSSI
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu
+                            
+                    elif ww==24: #RSSI小到大、hop大到小
+                        RSSIR = duishu(commu_range)
+                        RSSI = RSSIR
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += duishu(appr_dis[k][j])
+                            else:
+                                dihop += 1/hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = duishu(appr_dis[k][beacon_node-1]) / RSSI
+                        else:
+                            apupu = ((1/hops_num[i][beacon_node-1])/dihop)* RSSIR/ RSSI
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = duishu(appr_dis[k][j]) / RSSI
+                            else:
+                                D[j][j] = ((1/ hops_num[i][j])/dihop)* RSSIR/ RSSI
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu
+                    
+                    elif ww==25: #RSSI大到大、hop大到小
+                        RSSIR = 1/duishu(commu_range)
+                        RSSI = RSSIR
+                        dihop = 0
+                        for j in range(0,beacon_node):  
+                            if hops_num[i][j] <= point_hop:
+                                RSSI += 1/duishu(appr_dis[k][j])
+                            else:
+                                dihop += 1/hops_num[i][j]        
+                        #最后一个信标节点权重测算        
+                        if hops_num[i][beacon_node-1] <= point_hop:
+                            apupu = (1/duishu(appr_dis[k][beacon_node-1])) / RSSI
+                        else:
+                            apupu = ((1/hops_num[i][beacon_node-1])/dihop)* RSSIR/ RSSI
+                        if math.isnan(apupu) == True:
+                            apupu = 0.0001
+                        if math.isinf(apupu) == True:
+                            apupu = 0.0001
+                       #权重矩阵
+                        for j in range(0,beacon_node-1):
+                            if hops_num[i][j] <= point_hop:
+                                D[j][j] = (1/duishu(appr_dis[k][j])) / RSSI
+                            else:
+                                D[j][j] = ((1/ hops_num[i][j])/dihop)* RSSIR/ RSSI
+                            if math.isnan(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            if math.isinf(D[j][j]) == True:
+                                D[j][j] = 0.0001
+                            D[j][j] = D[j][j] + apupu                        
+                            
+                    ATA = np.transpose(A)
+                    C1 = np.dot(ATA,D)
+                    C = np.dot(C1,A)
+                    C_C = np.linalg.inv(C)
+                    CAT = np.dot(C_C,ATA)
+                    X1 = np.dot(CAT,D)
+                    X = np.dot(X1,B)
+                    unknown_array[k][2] = X[0][0]
+                    unknown_array[k][3] = X[1][0]
+                sum_error = 0
+                sum_rmse = 0
+                for i in range(0,unknown_node):
+                    error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                    sum_rmse += error_k
+                    sum_error += (error_k) ** 0.5
+                error_avg = sum_error/(unknown_node * commu_range)
+                rmse = (sum_error/unknown_node) ** 0.5
+                #print(error_avg)
+                #print(rmse)
+                #向excel中写入表头
+                sheet.cell(row=1, column=6 + 78*point_t + 3*ww).value = '权重设置' + str(point_hop) + '-' + str(ww+1)
+                #向excel中写入对应的value
+                sheet.cell(row=2, column=6 + 78*point_t + 3*ww).value = '平均误差'
+                sheet.cell(row=3, column=6 + 78*point_t + 3*ww).value = error_avg
+                sheet.cell(row=2, column=7 + 78*point_t + 3*ww).value = "RMSE"
+                sheet.cell(row=3, column=7 + 78*point_t + 3*ww).value = rmse
+
+                if ti==0:
+                    sheet1.cell(row=ti+1, column=2 + 26*point_t + ww).value = '权重设置' + str(point_hop) + '-' + str(ww+1)
+                    sheet2.cell(row=ti+1, column=2 + 26*point_t + ww).value = '权重设置' + str(point_hop) + '-' + str(ww+1)
+                sheet1.cell(row=ti+2, column=2 + 26*point_t + ww).value = error_avg
+                sheet2.cell(row=ti+2, column=2 + 26*point_t + ww).value = rmse
+
+                for ni in range(0,unknown_node):
+                    sheet.cell(row=beacon_node+2+ni, column=6 + 78*point_t + 3*ww).value = unknown_array[ni][2]
+                    sheet.cell(row=beacon_node+2+ni, column=7 + 78*point_t + 3*ww).value = unknown_array[ni][3]            
+        wb.save(excelname)
+        wb1.save(excelname1)
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组测试-3存储完成！')  
+        
+        #4测试 极大似然估计修正
+        excelname1 = '4-'+str(str(ttn+1)+'汇总-节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook1 = xlsxwriter.Workbook(excelname1)     #新建excel表
+        #汇总工作簿工作表初始化
+        wb1 = openpyxl.load_workbook(excelname1)
+        sheet1 = wb1['Sheet1']
+        sheet2 = wb1['Sheet2']
+        sheet1.cell(row=ti+2, column=1).value = ti+1
+        sheet2.cell(row=ti+2, column=1).value = ti+1
+        
+        #数据存储工作簿建立
+        excelname = '4-'+str(str(ttn+1)+'节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook = xlsxwriter.Workbook(excelname)     #新建excel表    
+        wb = openpyxl.load_workbook(excelname) # 获取workbook中所有的表格
+        sheetname = str('sheet'+str(ti+1)) 
+        sheet = wb[sheetname]
+        
+        for j in range(0,total_node):
+            sheet.cell(row=j+2, column=1).value = j+1
+            sheet.cell(row=j+2, column=2).value = node_array[j][0]
+            sheet.cell(row=j+2, column=3).value = node_array[j][1]
+            sheet.cell(row=j+2, column=4).value = node_array[j][2]        
+        
+        #逐次修正-统计20次
+        for delttim in range(0,21):
+            #未知节点估计 最小二乘法
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+                ATA = np.transpose(A)
+                C = np.dot(ATA,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X = np.dot(CAT,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+                deltbiao = delttim
+                while deltbiao != 0:
+                    deltbiao = deltbiao - 1
+                    axidi = 0
+                    ayi2 = 0
+                    ayidi =0
+                    axiayi = 0
+                    axi2 =0        
+                    for j in range(0,beacon_node):
+                        dex = unknown_array[k][2]-beacon_array[j][0]
+                        dey = unknown_array[k][3]-beacon_array[j][1]
+                        dii = (dex ** 2 + dey ** 2) ** 0.5
+                        di = dii - appr_dis[k][j]
+                        if dex == 0:
+                            axi = 0
+                        else:
+                            axi = -dex / dii
+                        if dey ==0:
+                            ayi = 0
+                        else:
+                            ayi = -dey / dii
+                        axidi += axi * di
+                        ayidi += ayi * di
+                        axi2 += axi * axi
+                        ayi2 += ayi * ayi
+                        axiayi += axi * ayi
+                    delt_x = (axidi * ayi2 - ayidi * axiayi) / (axi2 * ayi2 - axiayi * axiayi)
+                    delt_y = (ayidi * axi2 - axidi * axiayi) / (axi2 * ayi2 - axiayi * axiayi)
+                    if delt_x != delt_x:
+                        delt_x = 0
+                    if delt_y != delt_y:
+                        delt_y = 0
+                    unknown_array[k][2] += delt_x
+                    unknown_array[k][3] += delt_y
+
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+            #print(error_avg)
+            #print(rmse)
+
+            #向excel中写入表头
+            sheet.cell(row=1, column=6 + 3*delttim).value = '极大似然估计修正'+str(delttim)+'次'    
+
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=6 + 3*delttim).value = '平均误差'
+            sheet.cell(row=3, column=6 + 3*delttim).value = error_avg
+            sheet.cell(row=2, column=7 + 3*delttim).value = "RMSE"
+            sheet.cell(row=3, column=7 + 3*delttim).value = rmse
+
+            if ti==0:
+                sheet1.cell(row=ti+1, column=2+delttim).value = '极大似然估计修正'+str(delttim)+'次' 
+                sheet2.cell(row=ti+1, column=2+delttim).value = '极大似然估计修正'+str(delttim)+'次' 
+            sheet1.cell(row=ti+2, column=2+delttim).value = error_avg
+            sheet2.cell(row=ti+2, column=2+delttim).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=6 + 3*delttim).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=7 + 3*delttim).value = unknown_array[ni][3]        
+        
+        wb.save(excelname)
+        wb1.save(excelname1)
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组测试-4存储完成！')
+        
+
+
+#生成测试项目参数序列
+import openpyxl
+import numpy as np
+import pandas as pd
+import math
+import random
+from openpyxl import load_workbook
+import xlsxwriter
+test_title = np.zeros((53,3),int)#节点数、比例、半径
+kongzhiqi = np.zeros((16,4),int)
+for i in range(0,9): #节点数100-500 间隔50,0.3 100
+    test_title[i][0] = 100 + i*50
+    test_title[i][1] = 30
+    test_title[i][2] = 100
+for i in range(9,18): #节点数150 比例0.1 0.2 半径100
+    test_title[i][0] = 150
+    test_title[i][1] = 10 + 10*(i-9)
+    test_title[i][2] = 100
+for i in range(18,31): #节点数150 比例0.3半径100-400间隔25
+    test_title[i][0] = 150
+    test_title[i][1] = 30
+    test_title[i][2] = 100 + 25*(i-18)
+for i in range(31,41):
+    test_title[i][0] = 50 + 50 + 50 *(i-31)
+    test_title[i][1] = 50/test_title[i][0]*100
+    test_title[i][2] = 100
+for i in range(41,53):
+    test_title[i][0] = 25 + 25*(i-41) + 100
+    test_title[i][1] = (25 + 25*(i-41))/test_title[i][0]*100
+    test_title[i][2] = 100
+for i in range(0,16):
+    a = i
+    for j in range(0,4):
+        b = a%2
+        a = a//2
+        kongzhiqi[i][j]=b
+#print(test_title)
+#print(kongzhiqi)
+
+#生成原始数据存储文件、初步汇总存储文件
+mul_time = 100
+arrnum=53
+for ttn in range(0,arrnum):
+    total_node = test_title[ttn][0]
+    beacon_percent = round(0.01 * test_title[ttn][1], 2)
+    commu_range = test_title[ttn][2]
+    excelname1 = str(str(ttn+1)+'节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+    workbook1 = xlsxwriter.Workbook(excelname1)     #新建excel表
+    for i in range(0,mul_time):
+        sheetname1 = str('sheet'+str(i+1))
+        worksheet1 = workbook1.add_worksheet(sheetname1)       #新建sheet（sheet的名称为"sheet1"）
+        worksheet1.write_row('A1','序')
+        worksheet1.write_row('B1','横')
+        worksheet1.write_row('C1','纵')
+        worksheet1.write_row('D1','标')
+    workbook1.close() #关闭
+
+    excelname2 = str(str(ttn+1)+'汇总-节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+    workbook2 = xlsxwriter.Workbook(excelname2)     #新建excel表
+    for k in range(0,2): #新建2个工作簿
+        sheetname2 = str('Sheet'+str(k+1))
+        worksheet2 = workbook2.add_worksheet(sheetname2)
+        worksheet2.write_row('A1','组序号')
+    workbook2.close() #关闭
+
+x_length = 500
+y_length = 500
+
+def duishu(ligi):
+    if ligi <= 1:
+        fanhui = 0.0001
+    else:
+        fanhui = np.log10(ligi)
+    if math.isnan(fanhui) == True:
+        fanhui = 0.0001
+    if math.isinf(fanhui) == True:
+        fanhui = 0.0001
+    return fanhui
+
+for ttn in range(0,arrnum):
+    total_node = test_title[ttn][0]
+    beacon_percent = round(0.01 * test_title[ttn][1], 2)
+    commu_range = test_title[ttn][2]
+    
+    for ti in range(0,mul_time):        
+        beacon_node = int(total_node * beacon_percent)
+        unknown_node = int(total_node - beacon_node)
+        node_array = np.zeros((total_node,3),dtype = int)
+        beacon_array = np.zeros((beacon_node,5),dtype = int)
+        unknown_array = np.zeros((unknown_node,4),dtype = int)
+        hops_num = np.zeros((total_node, total_node))
+        distance = np.zeros((total_node, total_node))
+        hops_before = np.zeros((total_node, total_node))
+        appr_dis = np.zeros((unknown_node,beacon_node),int)
+        distance_commu = np.zeros((total_node, total_node))
+        re_label = 1
+        re = 0
+        while re_label != 0:
+            re += 1
+            re_label = 0
+            for j in range(0,total_node):  #生成测试数组
+                x_axis = random.randrange(0,x_length)
+                y_axis = random.randrange(0,y_length)
+                node_array[j][0] = x_axis
+                node_array[j][1] = y_axis
+                if j <beacon_node:
+                    node_array[j][2] = 1
+                    beacon_array[j][0]=node_array[j][0]
+                    beacon_array[j][1]=node_array[j][1]
+                    beacon_array[j][2]=1
+                else:
+                    node_array[j][2] = 0
+                    unknown_array[j-beacon_node][0]=node_array[j][0]
+                    unknown_array[j-beacon_node][1]=node_array[j][1]
+                    unknown_array[j-beacon_node][2]=0
+
+            for i in range(0,total_node):   #测算实际距离
+                for j in range(0,total_node):
+                    if i == j:
+                        hops_num[i][j] = 0
+                        distance[i][j] = 0
+                    else:
+                        distance[i][j] = ((node_array[i][0] - node_array[j][0]) ** 2 + (node_array[i][1] - node_array[j][1]) ** 2) ** 0.5
+                        if distance[i][j] <= commu_range:
+                            hops_num[i][j] = 1
+                        else:
+                            hops_num[i][j] = float("inf")
+                    distance_commu[i][j] = distance[i][j]
+                    
+            biaoji = 1
+            while biaoji != 0:
+                biaoji = 0
+                for i in range(0,total_node):
+                    for j in range(0,total_node):
+                        for k in range(0,total_node):
+                            if (hops_num[i][k]+hops_num[k][j]) < hops_num[i][j]:
+                                hops_num[i][j] = hops_num[i][k]+hops_num[k][j]
+                                biaoji += 1
+                                distance_commu[i][j] = distance_commu[i][k] + distance_commu[k][j]
+
+            for xx in range(0,total_node):
+                for yy in range(0,total_node):
+                    if (xx != yy) & (hops_num[xx][yy] == 0):
+                        re_label += 1
+                    if math.isinf(hops_num[xx][yy]) == True:
+                        re_label += 1
+        print(re)
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组数据生成成功！')
+
+        #计算信标结点平均跳距矩阵
+        for i in range(0,beacon_node):
+            dist_sum = 0
+            hop_sum = 0
+            for j in range(0,beacon_node):
+                dist_sum += distance[i][j]
+                hop_sum += hops_num[i][j]
+            beacon_array[i][2] = dist_sum / hop_sum
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组测试准备完成！')
+        
+        
+        #打开存储文件
+        excelname1 = str(str(ttn+1)+'汇总-节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook1 = xlsxwriter.Workbook(excelname1)     #获取excel表
+        #汇总工作簿工作表初始化
+        wb1 = openpyxl.load_workbook(excelname1)
+        sheet1 = wb1['Sheet1']
+        sheet2 = wb1['Sheet2']
+        sheet1.cell(row=ti+2, column=1).value = ti+1
+        sheet2.cell(row=ti+2, column=1).value = ti+1
+        
+        #数据存储工作簿建立打开
+        excelname = str(str(ttn+1)+'节点数' + str(total_node) + '-信标比例'+str(beacon_percent)+'-通信半径'+str(commu_range)+'.xlsx')
+        workbook = xlsxwriter.Workbook(excelname)     #新建excel表    
+        wb = openpyxl.load_workbook(excelname) # 获取workbook中所有的表格
+        sheetname = str('sheet'+str(ti+1)) 
+        sheet = wb[sheetname]
+        
+        for j in range(0,total_node):
+            sheet.cell(row=j+2, column=1).value = j+1
+            sheet.cell(row=j+2, column=2).value = node_array[j][0]
+            sheet.cell(row=j+2, column=3).value = node_array[j][1]
+            sheet.cell(row=j+2, column=4).value = node_array[j][2]
+        
+        
+        for kongzhi in range(0,16):
+            #控制是否修正信标节点的平均跳距
+            if kongzhiqi[kongzhi][0] == 0:
+                for i in range(0,beacon_node):
+                    beacon_array[i][3] = beacon_array[i][2]
+            else:
+                for i in range(0,beacon_node):
+                    taosum = 0
+                    hopsum = 0
+                    for j in range(0,beacon_node):
+                        if i != j:
+                            taosum += abs(beacon_array[i][2] * hops_num[i][j] - distance[i][j])
+                            hopsum += hops_num[i][j]   
+                    beacon_array[i][3] = beacon_array[i][2] + 0.4 * taosum/hopsum  
+                    
+            #控制估计距离矩阵是否修正
+            if kongzhiqi[kongzhi][1] == 0:
+                for i in range(0,unknown_node):
+                    min_hop = float("inf")
+                    min_hop_dis = float("inf")
+                    min_hop_disdis = float("inf")        
+                    for j in range(0,beacon_node):
+                        if min_hop_disdis > distance_commu[i+beacon_node][j]:
+                            min_hop = hops_num[i+beacon_node][j]                  
+                            min_hop_dis = beacon_array[j][3]
+                            min_hop_disdis = distance_commu[i+beacon_node][j]
+                    use_hop_dis = min_hop_dis
+                    for j in range(0,beacon_node):
+                        appr_dis[i][j] = use_hop_dis * hops_num[i+beacon_node][j]
+            else:
+                for i in range(0,unknown_node):
+                    for j in range(0,beacon_node):
+                        appr_dis[i][j] = beacon_array[j][3] * hops_num[i+beacon_node][j]
+            if ttn<18 or tnn>30:
+                point_hop = 2
+            else:
+                point_hop = 1
+            
+            A = np.zeros((beacon_node-1,2))
+            BB = np.zeros((beacon_node-1,1))
+            B = np.zeros((beacon_node-1,1))
+            for i in range(beacon_node, total_node):
+                k = i - beacon_node
+                D = np.zeros((beacon_node-1,beacon_node-1))
+                for j in range(0,beacon_node-1):
+                    A[j][0] = 2 * (beacon_array[j][0]-beacon_array[beacon_node-1][0])
+                    A[j][1] = 2 * (beacon_array[j][1]-beacon_array[beacon_node-1][1])
+                    B[j][0] = (beacon_array[j][0] ** 2) - (beacon_array[beacon_node-1][0] ** 2 ) + (beacon_array[j][1] ** 2) - (beacon_array[beacon_node-1][1] ** 2 )+ (appr_dis[k][beacon_node-1] ** 2) - (appr_dis[k][j] ** 2)
+
+                #控制权重矩阵：
+                if kongzhiqi[kongzhi][2] == 0:
+                    for j in range(0,beacon_node-1):
+                        D[j][j] = 1
+                elif ttn<26 or tnn>30:
+                    RSSIR = 1/duishu(commu_range)
+                    RSSI = RSSIR
+                    dihop = 0
+                    for j in range(0,beacon_node):  
+                        if hops_num[i][j] <= point_hop:
+                            RSSI += 1/duishu(appr_dis[k][j])
+                        else:
+                            dihop += 1/hops_num[i][j]        
+                    #最后一个信标节点权重测算        
+                    if hops_num[i][beacon_node-1] <= point_hop:
+                        apupu = (1/duishu(appr_dis[k][beacon_node-1])) / RSSI
+                    else:
+                        apupu = ((1/hops_num[i][beacon_node-1])/dihop)* RSSIR/ RSSI
+                    if math.isnan(apupu) == True:
+                        apupu = 0.0001
+                    if math.isinf(apupu) == True:
+                        apupu = 0.0001
+                   #权重矩阵
+                    for j in range(0,beacon_node-1):
+                        if hops_num[i][j] <= point_hop:
+                            D[j][j] = (1/duishu(appr_dis[k][j])) / RSSI
+                        else:
+                            D[j][j] = ((1/ hops_num[i][j])/dihop)* RSSIR/ RSSI
+                        if math.isnan(D[j][j]) == True:
+                            D[j][j] = 0.0001
+                        if math.isinf(D[j][j]) == True:
+                            D[j][j] = 0.0001
+                        D[j][j] = D[j][j] + apupu
+                else:
+                    RSSI = 0
+                    dihop = 0
+                    for j in range(0,beacon_node):  
+                        if hops_num[i][j] <= point_hop:
+                            RSSI += duishu(appr_dis[k][j])
+                        else:
+                            dihop += hops_num[i][j]        
+                    #最后一个信标节点权重测算        
+                    if hops_num[i][beacon_node-1] <= point_hop:
+                        apupu = duishu(appr_dis[k][beacon_node-1]) / RSSI
+                    else:
+                        apupu = hops_num[i][beacon_node-1]/dihop
+                    if math.isnan(apupu) == True:
+                        apupu = 0.0001
+                    if math.isinf(apupu) == True:
+                        apupu = 0.0001
+                   #权重矩阵
+                    for j in range(0,beacon_node-1):
+                        if hops_num[i][j] <= point_hop:
+                            D[j][j] = duishu(appr_dis[k][j]) / RSSI
+                        else:
+                            D[j][j] = hops_num[i][j]/dihop
+                        if math.isnan(D[j][j]) == True:
+                            D[j][j] = 0.0001
+                        if math.isinf(D[j][j]) == True:
+                            D[j][j] = 0.0001
+                        D[j][j] = D[j][j] + apupu
+                
+                ATA = np.transpose(A)
+                C1 = np.dot(ATA,D)
+                C = np.dot(C1,A)
+                C_C = np.linalg.inv(C)
+                CAT = np.dot(C_C,ATA)
+                X1 = np.dot(CAT,D)
+                X = np.dot(X1,B)
+                unknown_array[k][2] = X[0][0]
+                unknown_array[k][3] = X[1][0]
+                
+                #控制极大似然估计修正
+                if kongzhiqi[kongzhi][3] == 0:
+                    deltbiao = 0
+                else:
+                    deltbiao = 5
+                
+                while deltbiao != 0:
+                    deltbiao = deltbiao - 1
+                    axidi = 0
+                    ayi2 = 0
+                    ayidi =0
+                    axiayi = 0
+                    axi2 =0        
+                    for j in range(0,beacon_node):
+                        dex = unknown_array[k][2]-beacon_array[j][0]
+                        dey = unknown_array[k][3]-beacon_array[j][1]
+                        dii = (dex ** 2 + dey ** 2) ** 0.5
+                        di = dii - appr_dis[k][j]
+                        if dex == 0:
+                            axi = 0
+                        else:
+                            axi = -dex / dii
+                        if dey ==0:
+                            ayi = 0
+                        else:
+                            ayi = -dey / dii
+                        axidi += axi * di
+                        ayidi += ayi * di
+                        axi2 += axi * axi
+                        ayi2 += ayi * ayi
+                        axiayi += axi * ayi
+                    delt_x = (axidi * ayi2 - ayidi * axiayi) / (axi2 * ayi2 - axiayi * axiayi)
+                    delt_y = (ayidi * axi2 - axidi * axiayi) / (axi2 * ayi2 - axiayi * axiayi)
+                    if delt_x != delt_x:
+                        delt_x = 0
+                    if delt_y != delt_y:
+                        delt_y = 0
+                    unknown_array[k][2] += delt_x
+                    unknown_array[k][3] += delt_y                
+                
+            sum_error = 0
+            sum_rmse = 0
+            for i in range(0,unknown_node):
+                error_k = (unknown_array[i][0] - unknown_array[i][2]) ** 2 + (unknown_array[i][1] - unknown_array[i][3]) ** 2
+                sum_rmse += error_k
+                sum_error += (error_k) ** 0.5
+            error_avg = sum_error/(unknown_node * commu_range)
+            rmse = (sum_error/unknown_node) ** 0.5
+        
+            #向excel中写入表头
+            sheet.cell(row=1, column=6 + 3*kongzhi).value = '测试序号'+str(kongzhi+1)+'次'    
+
+            #向excel中写入对应的value
+            sheet.cell(row=2, column=6 + 3*kongzhi).value = '平均误差'
+            sheet.cell(row=3, column=6 + 3*kongzhi).value = error_avg
+            sheet.cell(row=2, column=7 + 3*kongzhi).value = "RMSE"
+            sheet.cell(row=3, column=7 + 3*kongzhi).value = rmse
+
+            if ti==0:
+                sheet1.cell(row=ti+1, column=2+kongzhi).value = '测试序号'+str(kongzhi+1)+'次' 
+                sheet2.cell(row=ti+1, column=2+kongzhi).value = '测试序号'+str(kongzhi+1)+'次' 
+            sheet1.cell(row=ti+2, column=2+kongzhi).value = error_avg
+            sheet2.cell(row=ti+2, column=2+kongzhi).value = rmse
+
+            for ni in range(0,unknown_node):
+                sheet.cell(row=beacon_node+2+ni, column=6 + 3*kongzhi).value = unknown_array[ni][2]
+                sheet.cell(row=beacon_node+2+ni, column=7 + 3*kongzhi).value = unknown_array[ni][3]        
+        
+        wb.save(excelname)
+        wb1.save(excelname1)
+        print('第'+str(ttn+1)+'参数配比-第'+str(ti+1)+'组测试-存储完成！') 
